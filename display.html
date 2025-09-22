@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>One Night — Display</title>
+  <style>
+    html, body { margin:0; padding:0; height:100%; background:transparent; }
+    #card-container { display:flex; flex-wrap:wrap; gap:12px; justify-content:center; align-items:flex-start; padding:12px; }
+    #card-container img { height:250px; width:auto; object-fit:contain; -webkit-user-drag:none; transition: transform 0.2s; }
+    #card-container img:hover { transform: scale(1.05); }
+    .placeholder { height:250px; width:180px; display:flex; align-items:center; justify-content:center; color:#888; border:2px dashed #555; background:#333; }
+  </style>
+</head>
+<body>
+  <div id="card-container"></div>
+
+  <script>
+    const container = document.getElementById("card-container");
+    const ws = new WebSocket("ws://192.168.12.19:3000"); // replace with server IP
+
+    function render(cards) {
+      container.innerHTML = "";
+      if (!cards || cards.length === 0) {
+        const p = document.createElement("div");
+        p.className = "placeholder";
+        p.textContent = "No cards to display";
+        container.appendChild(p);
+        return;
+      }
+      cards.forEach(b64 => {
+        const img = document.createElement("img");
+        img.src = b64;
+        container.appendChild(img);
+      });
+    }
+
+    ws.onopen = () => console.log("Display WebSocket connected");
+    ws.onclose = () => console.log("Display WebSocket disconnected");
+    ws.onerror = e => console.error("WebSocket error", e);
+
+    ws.onmessage = (msg) => {
+      try {
+        const data = JSON.parse(msg.data);
+        if (data.type === "displayCards") {
+          render(data.data);
+        }
+      } catch(err) {
+        console.error("Invalid message:", msg.data);
+      }
+    };
+  </script>
+</body>
+</html>

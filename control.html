@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>One Night Control</title>
+    <style>
+        body {
+            background: #1e1e1e;
+            color: #fff;
+            font-family: sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #app {
+            display: flex;
+            height: 100%;
+            padding: 16px;
+            box-sizing: border-box;
+        }
+
+        #sidebar {
+            display: flex;
+            flex-direction: column;
+            width: 300px;
+            margin-right: 16px;
+        }
+
+        #content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        fieldset {
+            border: 2px solid #555;
+            padding: 16px;
+            border-radius: 0;
+            background: #282828;
+            transition: border-color 0.2s ease-in-out;
+        }
+
+        fieldset:hover {
+            border-color: #4caf50;
+        }
+
+        #sidebar fieldset:first-of-type {
+            margin-bottom: 16px;
+        }
+
+        #sidebar fieldset:last-of-type {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #content fieldset {
+            flex-grow: 1;
+            margin-bottom: 0;
+        }
+
+        legend {
+            font-size: 0.8em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #888;
+            padding: 0 8px;
+            margin-left: -8px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.2em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #buttons-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        button {
+            padding: 12px;
+            background: #444;
+            color: #fff;
+            border: 1px solid #666;
+            border-radius: 0;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease-out;
+        }
+
+        button:hover {
+            background: #555;
+        }
+
+        button:active {
+            transform: scale(0.98);
+            background-color: #666;
+        }
+
+        #controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding-top: 16px;
+        }
+
+        .thumb {
+            width: 120px;
+            border: 3px solid transparent;
+            border-radius: 0;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,.4);
+            transition: border-color 0.2s ease-in-out, transform 0.1s ease-out;
+        }
+
+        .thumb img {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 0;
+        }
+
+        .thumb.active {
+            border-color: #4caf50;
+        }
+
+        .thumb:hover {
+            border-color: #4caf50;
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+      <div id="sidebar">
+        <fieldset>
+          <legend>Title</legend>
+          <h1>ONE NIGHT WEREWOLF CONTROL PANEL</h1>
+        </fieldset>
+        <fieldset>
+          <legend>Controls</legend>
+          <button id="updateBtn">Update Display</button>
+          <button id="resetBtn">Reset</button>
+        </fieldset>
+      </div>
+      <div id="content">
+        <fieldset>
+          <legend>Selection</legend>
+          <div id="controls"></div>
+        </fieldset>
+      </div>
+    </div>
+  
+    <script>
+      const ws = new WebSocket('ws://192.168.12.19:3000'); // replace with your server IP
+      const controls = document.getElementById("controls");
+      const updateBtn = document.getElementById("updateBtn");
+      const resetBtn = document.getElementById("resetBtn");
+  
+      // List of image files (on the control PC)
+      const files = [
+        "onw-copycat.png","onw-dopoganger.png","onw-werewolf.png",
+        "onw-alpha-wolf.png","onw-mystic-wolf.png","onw-minion.png",
+        "onw-app-tanner.png","onw-mason.png","onw-seer.png",
+        "onw-app-seer.png","onw-paranorm.png","onw-robber.png",
+        "onw-witch.png","onw-troublemaker.png","onw-aura-seer.png",
+        "onw-gremlin.png","onw-drunk.png","onw-insomniac.png",
+        "onw-squire.png","onw-beholder.png","onw-revealer.png",
+        "onw-dream-wolf.png","onw-villager.png","onw-tanner.png",
+        "onw-hunter.png","onw-bodyguard.png","onw-prince.png",
+        "onw-cursed.png"
+      ];
+  
+      let selected = [];
+  
+      // Render thumbnails
+      function render() {
+        controls.innerHTML = "";
+        files.forEach(f => {
+          const div = document.createElement("div");
+          div.className = "thumb";
+          if (selected.includes(f)) div.classList.add("active");
+  
+          const img = document.createElement("img");
+          img.src = "static/img/" + f; // local file on control PC
+          div.appendChild(img);
+  
+          div.onclick = () => {
+            if (selected.includes(f)) selected = selected.filter(x => x!==f);
+            else selected.push(f);
+            render();
+          };
+          controls.appendChild(div);
+        });
+      }
+  
+      // Convert selected images to Base64 and send over WS
+      async function pushUpdate() {
+        const payload = [];
+        for (let f of selected) {
+          try {
+            const res = await fetch("static/img/" + f);
+            const blob = await res.blob();
+            const reader = new FileReader();
+            const base64 = await new Promise(r => {
+              reader.onloadend = () => r(reader.result);
+              reader.readAsDataURL(blob);
+            });
+            payload.push(base64);
+          } catch (err) {
+            console.error("Failed to load file:", f, err);
+          }
+        }
+        ws.send(JSON.stringify({ type:'updateCards', data: payload }));
+      }
+  
+      updateBtn.addEventListener("click", pushUpdate);
+      resetBtn.addEventListener("click", () => { selected=[]; pushUpdate(); render(); });
+      render();
+  
+      ws.onopen = () => console.log("WebSocket connected");
+      ws.onclose = () => console.log("WebSocket disconnected");
+    </script>
+  </body>
+  </html>
